@@ -1,5 +1,6 @@
 package com.stephapps.alternativewidgetforkeep;
 
+import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
@@ -9,6 +10,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
@@ -23,14 +25,17 @@ import java.util.List;
 
 public class WidgetProvider extends AppWidgetProvider {
 
-    SQLiteDatabase db;
+   public static final String EXTRA_LIST_VIEW_ROW_NUMBER = "com.stephapps.alternatewidgetforkeep.EXTRA_LIST_VIEW_ROW_NUMBER";
+   public static final String NOTE_CLICKED = "com.stephapps.alternatewidgetforkeep.NOTE_CLICKED";
+   SQLiteDatabase db;
    private List<Note> mNotes = new ArrayList<Note>();
 
 	public void onReceive(Context context, Intent intent)
 	{
 		super.onReceive(context, intent);
 		String action = intent.getAction();
-		if (AppWidgetManager.ACTION_APPWIDGET_UPDATE.equals(action)) {
+        Log.i("WidgetProvider","test"+action);
+		if (action.equals(AppWidgetManager.ACTION_APPWIDGET_UPDATE)) {
 
 			RemoteViews views = new RemoteViews(context.getPackageName(),
 					R.layout.widget);
@@ -41,6 +46,14 @@ public class WidgetProvider extends AppWidgetProvider {
 							intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS),
 							views);
 		}
+        else if (action.equals(NOTE_CLICKED))
+        {
+            int appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID);
+            int viewIndex = intent.getIntExtra(EXTRA_LIST_VIEW_ROW_NUMBER, 0);
+            Toast.makeText(context, "Touched view " + viewIndex, Toast.LENGTH_SHORT).show();
+
+        }
 	}
 
 	@Override
@@ -74,11 +87,22 @@ public class WidgetProvider extends AppWidgetProvider {
 
 
         final int N = appWidgetIds.length;
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < N; ++i)
+        {
             RemoteViews remoteViews = updateWidgetListView(context,
                     appWidgetIds[i]);
-            appWidgetManager.updateAppWidget(appWidgetIds[i],
-                    remoteViews);
+
+            Intent intent = new Intent(context, WidgetProvider.class);
+            intent.setAction(WidgetProvider.NOTE_CLICKED);
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetIds[i]);
+            intent.setData(Uri.parse(intent.toUri(Intent.URI_INTENT_SCHEME)));
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+            remoteViews.setPendingIntentTemplate(R.id.lstViewNotes, pendingIntent);
+
+
+            appWidgetManager.updateAppWidget(appWidgetIds[i],  remoteViews);
+
         }
 
 

@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
@@ -98,6 +99,13 @@ public class ListProvider implements RemoteViewsService.RemoteViewsFactory {
         else if (color.equals("ORANGE"))    colorInt = android.R.color.holo_orange_light;
         else if (color.equals("YELLOW"))    colorInt = android.R.color.holo_purple;
         remoteView.setInt(R.id.txtRow, "setBackgroundColor", context.getResources().getColor(colorInt));
+
+        Bundle extras = new Bundle();
+        extras.putInt(WidgetProvider.EXTRA_LIST_VIEW_ROW_NUMBER, position);
+        Intent fillIntent = new Intent();
+        fillIntent.putExtras(extras);
+        remoteView.setOnClickFillInIntent(R.id.txtRow, fillIntent);
+
         return remoteView;
     }
 
