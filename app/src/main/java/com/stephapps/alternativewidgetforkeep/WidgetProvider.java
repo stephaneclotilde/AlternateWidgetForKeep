@@ -12,17 +12,19 @@ import android.preference.PreferenceManager;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
+import com.stephapps.alternativewidgetforkeep.misc.Constants;
+import com.stephapps.alternativewidgetforkeep.model.Note;
 import com.stericson.RootTools.RootTools;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 public class WidgetProvider extends AppWidgetProvider {
 
     SQLiteDatabase db;
-    private Set<String> mTextNotes;
+   private List<Note> mNotes = new ArrayList<Note>();
 
 	public void onReceive(Context context, Intent intent)
 	{
@@ -60,28 +62,8 @@ public class WidgetProvider extends AppWidgetProvider {
             changeFilePermissions(new String[]{"su" , "-c" , "chmod", "777" ,path});
             changeFilePermissions(new String[]{"su" , "-c" , "chmod", "777" , path+"-journal"});
 
-            File file = context.getDatabasePath(path);
-            if (file.exists()) {
-
-                try {
-                    db = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE);
-                    Cursor cursor = db.rawQuery("select * from text_search_list_items ", null);
-
-                    if (cursor != null) {
-                        mTextNotes = new HashSet<String>();
-                        cursor.moveToFirst();
-                        do {
-                            mTextNotes.add(cursor.getString(0));
-                        } while (cursor.moveToNext());
-                    }
-                }catch(Exception e) {e.printStackTrace();}
-
-
-                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-                SharedPreferences.Editor edit = prefs.edit();
-                edit.putStringSet("textNotes", mTextNotes);
-                edit.commit();
-            }
+            if (fillNoteListFromKeepDB(context, path))
+                saveNotesInfosToPrefs(context);
 
             changeFilePermissions(new String[]{"su" , "-c" , "chmod", "660" ,path});
             changeFilePermissions(new String[]{"su" , "-c" , "chmod", "660" , path+"-journal"});
@@ -107,6 +89,77 @@ public class WidgetProvider extends AppWidgetProvider {
          * your homescreen*/
 
         super.onUpdate(context, appWidgetManager, appWidgetIds);
+    }
+
+    private boolean fillNoteListFromKeepDB(Context context, String path)
+    {
+        Cursor cursor = null;
+        File file = context.getDatabasePath(path);
+        if (file.exists())
+        {
+
+            try {
+                db = SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE);
+                cursor = db.rawQuery("select * from list_item ", null);
+
+                if (cursor != null) {
+                    cursor.moveToFirst();
+                    do {
+                        mNotes.add(new Note(cursor.getInt(5), cursor.getString(4)));
+                    } while (cursor.moveToNext());
+
+                    cursor.close();
+                }
+
+                cursor = db.rawQuery("select * from tree_entity", null);
+                if (cursor != null) {
+                    cursor.moveToFirst();
+                    do {
+                        int id = cursor.getInt(0);
+                        for (Note note : mNotes)
+                        {
+                            if (id==note.getId())
+                            {
+                                note.setColor(cursor.getString(6));
+                                break;
+                            }
+                        }
+
+                    } while (cursor.moveToNext());
+
+                    cursor.close();
+                }
+                db.close();
+            } catch (Exception e) {
+                if (cursor != null) cursor.close();
+                if (db != null) db.close();
+                e.printStackTrace();
+
+                return false;
+            }
+
+            return true;
+        }
+        return false;
+    }
+
+    private void saveNotesInfosToPrefs(Context context)
+    {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        int nbNotes = mNotes.size();
+        Note currentNote;
+        for (int i=0;i<nbNotes;i++)
+        {
+            currentNote = mNotes.get(i);
+            edit.putString(Constants.TEXT_NOTE+i,currentNote.getNoteText());
+            edit.putInt(Constants.NOTE_ID+i, currentNote.getId());
+            edit.putString(Constants.NOTE_COLOR+i, currentNote.getColor());
+
+            edit.putInt(Constants.NB_NOTES, nbNotes);
+        }
+        edit.commit();
     }
 
     private void changeFilePermissions(String[] newPermissions)
